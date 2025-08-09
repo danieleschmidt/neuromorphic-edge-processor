@@ -9,10 +9,15 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 import traceback
-import psutil
 import threading
 from contextlib import contextmanager
 from functools import wraps
+
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 
 try:
     import wandb
@@ -36,10 +41,16 @@ class NeuromorphicFormatter(logging.Formatter):
     def format(self, record):
         # Add system information to log record
         if not hasattr(record, 'memory_usage_mb'):
-            record.memory_usage_mb = psutil.virtual_memory().used / 1024 / 1024
+            if PSUTIL_AVAILABLE:
+                record.memory_usage_mb = psutil.virtual_memory().used / 1024 / 1024
+            else:
+                record.memory_usage_mb = 0.0
             
         if not hasattr(record, 'cpu_usage_percent'):
-            record.cpu_usage_percent = psutil.cpu_percent()
+            if PSUTIL_AVAILABLE:
+                record.cpu_usage_percent = psutil.cpu_percent()
+            else:
+                record.cpu_usage_percent = 0.0
         
         # Custom format with neuromorphic context
         log_format = (
@@ -217,11 +228,15 @@ class ExperimentLogger:
     def _log_system_info(self):
         """Log system and environment information."""
         system_info = {
-            "cpu_count": psutil.cpu_count(),
-            "memory_total_gb": psutil.virtual_memory().total / 1024**3,
             "python_version": sys.version,
             "platform": sys.platform,
         }
+        
+        if PSUTIL_AVAILABLE:
+            system_info.update({
+                "cpu_count": psutil.cpu_count(),
+                "memory_total_gb": psutil.virtual_memory().total / 1024**3,
+            })
         
         # GPU information
         try:
@@ -433,13 +448,19 @@ def log_performance(func):
         logger = get_logger(f"performance.{func.__module__}.{func.__name__}")
         
         start_time = time.time()
-        start_memory = psutil.virtual_memory().used / 1024**2
+        if PSUTIL_AVAILABLE:
+            start_memory = psutil.virtual_memory().used / 1024**2
+        else:
+            start_memory = 0.0
         
         try:
             result = func(*args, **kwargs)
             
             end_time = time.time()
-            end_memory = psutil.virtual_memory().used / 1024**2
+            if PSUTIL_AVAILABLE:
+                end_memory = psutil.virtual_memory().used / 1024**2
+            else:
+                end_memory = start_memory
             
             execution_time = end_time - start_time
             memory_delta = end_memory - start_memory
