@@ -6,6 +6,8 @@ from typing import Dict, Any, List, Optional, Union, Tuple
 import re
 import hashlib
 import json
+import sys
+import os
 from pathlib import Path
 from ..utils.logging import SecurityLogger
 
