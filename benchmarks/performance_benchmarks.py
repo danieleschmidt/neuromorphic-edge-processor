@@ -5,11 +5,15 @@ import torch
 import numpy as np
 from typing import Dict, List, Optional, Callable, Any
 from dataclasses import dataclass
-from ..src.models.spiking_neural_network import SpikingNeuralNetwork
-from ..src.models.liquid_state_machine import LiquidStateMachine
-from ..src.models.reservoir_computer import ReservoirComputer
-from ..src.algorithms.event_processor import EventDrivenProcessor
-from ..src.algorithms.spike_processor import SpikeProcessor
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from src.models.spiking_neural_network import SpikingNeuralNetwork
+from src.models.liquid_state_machine import LiquidStateMachine
+from src.models.reservoir_computer import ReservoirComputer
+from src.algorithms.event_processor import EventDrivenProcessor
+from src.algorithms.spike_processor import SpikeProcessor
 
 
 @dataclass
