@@ -8,9 +8,8 @@ import tempfile
 import json
 from pathlib import Path
 
-from src.models.lif_neuron import LIFNeuron
-from src.models.population import NeuronPopulation
-from src.models.spiking_network import SpikingNeuralNetwork
+from src.models.neurons import LIFNeuron
+from src.models.spiking_neural_network import SpikingNeuralNetwork
 
 
 class TestLIFNeuron:

@@ -9,7 +9,9 @@ import sys
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from models.spiking_neural_network import SpikingNeuralNetwork, LIFNeuron, SpikingLayer
+from src.models.spiking_neural_network import SpikingNeuralNetwork
+from src.models.neurons import LIFNeuron
+from src.models.layers import SpikingLayer
 
 
 class TestLIFNeuron:
