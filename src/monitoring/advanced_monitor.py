@@ -1,6 +1,12 @@
 """Advanced monitoring system for neuromorphic processing."""
 
-import torch
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+
 import numpy as np
 import time
 import threading
@@ -287,7 +293,7 @@ class AdvancedMonitor:
             sparsity = 0.0
             spike_rate = 0.0
             
-            if spike_data is not None:
+            if spike_data is not None and TORCH_AVAILABLE:
                 sparsity = (spike_data == 0).float().mean().item()
                 if spike_data.numel() > 0:
                     total_spikes = spike_data.sum().item()
@@ -296,7 +302,7 @@ class AdvancedMonitor:
             
             # Estimate memory usage
             memory_usage_mb = 0.0
-            if torch.cuda.is_available():
+            if TORCH_AVAILABLE and torch.cuda.is_available():
                 memory_usage_mb = torch.cuda.memory_allocated() / 1024**2
             
             # Create model metrics

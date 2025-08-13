@@ -1,6 +1,11 @@
 """Comprehensive error handling and recovery mechanisms for neuromorphic systems."""
 
-import torch
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    
 import numpy as np
 import logging
 import traceback
@@ -274,7 +279,9 @@ class ErrorHandler:
     
     def _classify_error_severity(self, exception: Exception) -> ErrorSeverity:
         """Classify error severity based on exception type."""
-        if isinstance(exception, (MemoryError, torch.cuda.OutOfMemoryError)):
+        if isinstance(exception, MemoryError):
+            return ErrorSeverity.HIGH
+        elif TORCH_AVAILABLE and hasattr(torch.cuda, 'OutOfMemoryError') and isinstance(exception, torch.cuda.OutOfMemoryError):
             return ErrorSeverity.HIGH
         elif isinstance(exception, (RuntimeError, SystemError)):
             return ErrorSeverity.MEDIUM
@@ -285,7 +292,9 @@ class ErrorHandler:
     
     def _classify_error_category(self, exception: Exception) -> ErrorCategory:
         """Classify error category based on exception type."""
-        if isinstance(exception, (MemoryError, torch.cuda.OutOfMemoryError)):
+        if isinstance(exception, MemoryError):
+            return ErrorCategory.MEMORY
+        elif TORCH_AVAILABLE and hasattr(torch.cuda, 'OutOfMemoryError') and isinstance(exception, torch.cuda.OutOfMemoryError):
             return ErrorCategory.MEMORY
         elif isinstance(exception, RuntimeError):
             if "CUDA" in str(exception):
@@ -334,15 +343,15 @@ class ErrorHandler:
         try:
             import gc
             
-            # Clear PyTorch cache
-            if torch.cuda.is_available():
+            # Clear PyTorch cache if available
+            if TORCH_AVAILABLE and torch.cuda.is_available():
                 torch.cuda.empty_cache()
             
             # Force garbage collection
             gc.collect()
             
             # Get memory info
-            if torch.cuda.is_available():
+            if TORCH_AVAILABLE and torch.cuda.is_available():
                 allocated = torch.cuda.memory_allocated()
                 cached = torch.cuda.memory_reserved()
                 self.logger.info(f"Memory after cleanup - Allocated: {allocated/1024**2:.2f}MB, Cached: {cached/1024**2:.2f}MB")
@@ -413,7 +422,7 @@ class ErrorHandler:
     def _device_fallback_strategy(self, error_info: ErrorInfo, context: Any) -> Tuple[bool, Any]:
         """Recovery strategy: Fall back to CPU if GPU fails."""
         try:
-            if torch.cuda.is_available() and "CUDA" in error_info.message:
+            if TORCH_AVAILABLE and torch.cuda.is_available() and "CUDA" in error_info.message:
                 if context and isinstance(context, dict):
                     context['device'] = 'cpu'
                     context['gpu_fallback_applied'] = True
