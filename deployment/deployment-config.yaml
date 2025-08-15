@@ -1,0 +1,33 @@
+# Production deployment configuration for neuromorphic edge processor
+
+name: "neuromorphic-edge-processor"
+version: "1.0.0"
+target: "docker"  # Options: local, docker, kubernetes, edge_device, cloud
+environment: "production"  # Options: dev, staging, production
+
+# Resource requirements
+cpu_cores: 4.0
+memory_gb: 8.0
+gpu_required: false
+storage_gb: 20.0
+
+# Network configuration
+ports: [8080, 9090]  # API port, metrics port
+health_check_endpoint: "/health"
+metrics_endpoint: "/metrics"
+
+# Scaling configuration
+min_replicas: 2
+max_replicas: 10
+auto_scaling_enabled: true
+
+# Security configuration
+enable_tls: true
+secrets_path: "/etc/neuromorphic/secrets"
+security_scan_required: true
+
+# Monitoring configuration
+enable_logging: true
+log_level: "INFO"
+enable_metrics: true
+enable_tracing: true
