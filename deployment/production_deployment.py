@@ -4,8 +4,6 @@ import os
 import sys
 import time
 import json
-import yaml
-import docker
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -14,6 +12,19 @@ from enum import Enum
 import tempfile
 import shutil
 import logging
+
+# Optional imports with fallbacks
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+
+try:
+    import docker
+    DOCKER_AVAILABLE = True
+except ImportError:
+    DOCKER_AVAILABLE = False
 
 
 class DeploymentTarget(Enum):
@@ -98,11 +109,15 @@ class DeploymentManager:
         self.logger = self._setup_logger()
         
         # Docker client
-        try:
-            self.docker_client = docker.from_env()
-        except:
+        if DOCKER_AVAILABLE:
+            try:
+                self.docker_client = docker.from_env()
+            except:
+                self.docker_client = None
+                self.logger.warning("Docker client not available")
+        else:
             self.docker_client = None
-            self.logger.warning("Docker client not available")
+            self.logger.warning("Docker not available")
         
         # Deployment history
         self.deployment_history: List[Dict] = []
@@ -647,7 +662,11 @@ CMD ["python", "-m", "neuromorphic_edge_processor.server"]
         
         compose_path = self.artifacts_path / "docker-compose.yml"
         with open(compose_path, 'w') as f:
-            yaml.dump(compose_config, f)
+            if YAML_AVAILABLE:
+                yaml.dump(compose_config, f)
+            else:
+                # Fallback to JSON format
+                json.dump(compose_config, f, indent=2)
         
         return compose_path
     
@@ -737,7 +756,10 @@ WantedBy=multi-user.target
         
         prometheus_path = monitoring_dir / "prometheus.yml"
         with open(prometheus_path, 'w') as f:
-            yaml.dump(prometheus_config, f)
+            if YAML_AVAILABLE:
+                yaml.dump(prometheus_config, f)
+            else:
+                json.dump(prometheus_config, f, indent=2)
         
         return monitoring_dir
     
@@ -984,7 +1006,14 @@ def main():
     
     # Load configuration
     with open(args.config) as f:
-        config_data = yaml.safe_load(f)
+        if YAML_AVAILABLE:
+            config_data = yaml.safe_load(f)
+        else:
+            config_data = json.load(f)
+    
+    # Convert target string to enum
+    if isinstance(config_data.get('target'), str):
+        config_data['target'] = DeploymentTarget(config_data['target'])
     
     config = DeploymentConfig(**config_data)
     

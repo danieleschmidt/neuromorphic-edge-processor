@@ -1,0 +1,23 @@
+{
+  "name": "neuromorphic-edge-processor",
+  "version": "1.0.0",
+  "target": "local",
+  "environment": "development",
+  "cpu_cores": 1.0,
+  "memory_gb": 1.0,
+  "gpu_required": false,
+  "storage_gb": 2.0,
+  "ports": [8080, 8081],
+  "health_check_endpoint": "/health",
+  "metrics_endpoint": "/metrics",
+  "min_replicas": 1,
+  "max_replicas": 1,
+  "auto_scaling_enabled": false,
+  "enable_tls": false,
+  "secrets_path": null,
+  "security_scan_required": false,
+  "enable_logging": true,
+  "log_level": "INFO",
+  "enable_metrics": true,
+  "enable_tracing": false
+}
