@@ -16,7 +16,7 @@ import numpy as np
 
 from src.models.spiking_neural_network import SpikingNeuralNetwork
 from src.models.liquid_state_machine import LiquidStateMachine
-from src.models.reservoir_computer import ReservoirComputer
+from src.models.lif_neuron import LIFNeuron
 from src.algorithms.spike_processor import SpikeProcessor
 from src.algorithms.event_processor import EventDrivenProcessor
 from benchmarks.performance_benchmarks import PerformanceBenchmark
@@ -182,10 +182,16 @@ def create_model(model_type: str, config: Dict[str, Any], device: str):
     
     if model_type == "spiking":
         model = SpikingNeuralNetwork(
-            layer_sizes=model_config.get('layer_sizes', [config['input_size'], 128, 10]),
-            tau_mem=model_config.get('tau_mem', 20.0),
-            tau_syn=model_config.get('tau_syn', 5.0),
-            dt=model_config.get('dt', 1.0)
+            input_size=config['input_size'],
+            hidden_sizes=model_config.get('hidden_sizes', [128]),
+            output_size=model_config.get('output_size', 10),
+            neuron_params={
+                'tau_mem': model_config.get('tau_mem', 20.0),
+                'tau_syn': model_config.get('tau_syn', 5.0),
+                'threshold': model_config.get('threshold', 1.0),
+                'dt': model_config.get('dt', 1.0)
+            },
+            device=device
         )
     
     elif model_type == "lsm":
@@ -198,12 +204,12 @@ def create_model(model_type: str, config: Dict[str, Any], device: str):
         )
     
     elif model_type == "reservoir":
-        model = ReservoirComputer(
+        # Use LSM as reservoir computer alternative
+        model = LiquidStateMachine(
             input_size=config['input_size'],
             reservoir_size=config['reservoir_size'],
             output_size=model_config.get('output_size', 10),
-            reservoir_type=model_config.get('reservoir_type', 'esn'),
-            sparsity=model_config.get('sparsity', 0.1),
+            connectivity=model_config.get('sparsity', 0.1),
             spectral_radius=model_config.get('spectral_radius', 0.9)
         )
     
