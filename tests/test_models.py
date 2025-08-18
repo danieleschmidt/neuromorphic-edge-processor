@@ -8,8 +8,9 @@ import tempfile
 import json
 from pathlib import Path
 
-from src.models.neurons import LIFNeuron
-from src.models.spiking_neural_network import SpikingNeuralNetwork
+from src.models.lif_neuron import LIFNeuron, JAXLIFNeuron
+from src.models.spiking_neural_network import SpikingNeuralNetwork, SparseLinear, STDPLearning
+from src.models.liquid_state_machine import LiquidStateMachine, SpikingReadout
 
 
 class TestLIFNeuron:
@@ -17,7 +18,7 @@ class TestLIFNeuron:
     
     def setup_method(self):
         """Setup test fixtures."""
-        self.neuron = LIFNeuron()
+        self.neuron = LIFNeuron(device="cpu")
         self.batch_size = 2
         self.time_steps = 100
         
@@ -26,25 +27,26 @@ class TestLIFNeuron:
         neuron = LIFNeuron(
             tau_mem=10.0,
             tau_syn=2.0,
-            v_thresh=-45.0,
-            v_reset=-75.0,
-            adaptive_thresh=False
+            threshold=1.0,
+            reset_potential=0.0,
+            adaptive_threshold=False
         )
         
         assert neuron.tau_mem == 10.0
         assert neuron.tau_syn == 2.0
-        assert neuron.v_thresh == -45.0
-        assert neuron.v_reset == -75.0
-        assert not neuron.adaptive_thresh
+        assert neuron.threshold == 1.0
+        assert neuron.reset_potential == 0.0
+        assert not neuron.adaptive_threshold
         
     def test_forward_pass_shape(self):
         """Test forward pass returns correct shapes."""
         input_current = torch.randn(self.batch_size, self.time_steps)
+        self.neuron.reset_state(self.batch_size)
         
-        spikes, voltage = self.neuron(input_current)
+        spikes, states = self.neuron(input_current)
         
         assert spikes.shape == (self.batch_size, self.time_steps)
-        assert voltage.shape == (self.batch_size, self.time_steps)
+        assert states['membrane_potential'].shape == (self.batch_size, self.time_steps)
         assert spikes.dtype == torch.float32
         
     def test_spike_generation(self):
