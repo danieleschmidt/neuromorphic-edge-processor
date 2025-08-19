@@ -25,16 +25,11 @@ def basic_snn_example():
     layer_sizes = [784, 256, 128, 10]  # MNIST-like architecture
     model = SpikingNeuralNetwork(
         layer_sizes=layer_sizes,
-        neuron_params={
-            "tau_mem": 20.0,
-            "tau_syn": 5.0,  
-            "v_thresh": -50.0,
-            "v_reset": -70.0,
-            "v_rest": -65.0
-        },
-        connection_prob=0.1,
-        dt=0.1,
-        encoding_method="poisson"
+        membrane_tau=20.0,
+        threshold=1.0,
+        learning_rate=0.001,
+        stdp_enabled=True,
+        adaptive_threshold=True
     )
     
     logger.info(f"Created SNN with architecture: {layer_sizes}")
@@ -57,7 +52,8 @@ def basic_snn_example():
     # Forward pass
     logger.info("Performing forward pass...")
     with torch.no_grad():
-        output, spike_trains = model.forward(x, duration=100.0, return_spikes=True)
+        output, network_states = model.forward(x)
+        spike_trains = network_states['layer_outputs'] if isinstance(network_states['layer_outputs'], list) else [network_states['layer_outputs']]
     
     logger.info(f"Forward pass complete. Output shape: {output.shape}")
     
@@ -73,67 +69,72 @@ def basic_snn_example():
     logger.info(f"  Network sparsity: {sparsity:.3f}")
     logger.info(f"  Spikes per neuron per ms: {total_spikes / (total_neurons * 100):.3f}")
     
-    # Energy efficiency analysis
-    energy_metrics = model.compute_energy_consumption(spike_trains)
+    # Energy efficiency analysis 
+    energy_consumption = network_states.get('energy_consumption', 0.0)
     
     logger.info("Energy efficiency metrics:")
-    logger.info(f"  Energy efficiency: {energy_metrics['energy_efficiency']:.3f}")
-    logger.info(f"  Theoretical speedup: {energy_metrics['theoretical_speedup']:.2f}x")
+    logger.info(f"  Total energy consumption: {energy_consumption:.3f} mJ")
+    logger.info(f"  Network sparsity: {network_states.get('sparsity', 0.0):.3f}")
     
     # Training step demonstration
     logger.info("Demonstrating training step...")
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
-    loss, metrics = model.train_step(x, y_one_hot, duration=100.0)
+    # Simple training step simulation
+    model.train()
+    optimizer.zero_grad()
+    output, states = model.forward(x)
+    
+    # Simple MSE loss for demonstration
+    loss = torch.nn.functional.mse_loss(output, y_one_hot)
+    loss.backward()
+    optimizer.step()
     
     logger.info(f"Training step complete:")
-    logger.info(f"  Loss: {loss:.6f}")
-    logger.info(f"  Energy efficiency: {metrics['energy_efficiency']:.3f}")
+    logger.info(f"  Loss: {loss.item():.6f}")
+    logger.info(f"  Output spikes: {output.sum().item():.1f}")
     
     # Spike pattern analysis
     spike_processor = SpikeProcessor()
     
     # Analyze first layer spikes
-    first_layer_spikes = spike_trains[0]
-    spike_metrics = spike_processor.compute_spike_train_metrics(first_layer_spikes)
+    first_layer_spikes = spike_trains[0] if spike_trains else output
     
     logger.info("First layer spike analysis:")
-    logger.info(f"  Mean firing rate: {spike_metrics['mean_firing_rate']:.2f} Hz")
-    logger.info(f"  Network sparsity: {spike_metrics['sparsity']:.3f}")
-    
-    if spike_metrics.get('mean_isi'):
-        logger.info(f"  Mean ISI: {spike_metrics['mean_isi']:.2f} ms")
-        logger.info(f"  ISI CV: {spike_metrics['cv_isi']:.3f}")
+    logger.info(f"  Mean spike rate: {first_layer_spikes.mean().item():.4f}")
+    logger.info(f"  Max spike value: {first_layer_spikes.max().item():.4f}")
+    logger.info(f"  Sparsity level: {(first_layer_spikes == 0).float().mean().item():.3f}")
     
     # Visualization (save to file)
     logger.info("Creating visualizations...")
     
-    # Raster plot of first layer
+    # Create simple spike visualization
     output_dir = Path("outputs")
     output_dir.mkdir(exist_ok=True)
     
-    plt.figure(figsize=(12, 8))
-    spike_processor.visualize_spike_trains(
-        first_layer_spikes[0:1],  # First sample only
-        save_path=str(output_dir / "snn_raster_plot.png"),
-        max_neurons=50,
-        time_range=(0, 100)
-    )
+    plt.figure(figsize=(12, 6))
+    # Visualize spike pattern as heatmap
+    if first_layer_spikes.dim() >= 2:
+        spike_data = first_layer_spikes[:4].detach().cpu().numpy()  # First 4 samples
+        plt.imshow(spike_data, aspect='auto', cmap='hot', interpolation='nearest')
+        plt.colorbar(label='Spike Value')
+        plt.title('Spike Activity Pattern')
+        plt.xlabel('Neuron Index')
+        plt.ylabel('Sample Index')
+    plt.savefig(output_dir / "snn_spike_pattern.png", dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Activity over time
+    # Activity summary plot
     plt.figure(figsize=(10, 6))
-    network_activity = first_layer_spikes.sum(dim=1)  # Sum across neurons
-    time_axis = torch.arange(network_activity.shape[-1]) * model.dt
-    
-    for i in range(min(batch_size, 4)):
-        plt.plot(time_axis, network_activity[i], label=f'Sample {i+1}')
-    
-    plt.xlabel('Time (ms)')
-    plt.ylabel('Network Activity (spikes/ms)')
-    plt.title('Network Activity Over Time')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
+    if first_layer_spikes.dim() >= 2:
+        activity_per_sample = first_layer_spikes.sum(dim=1).detach().cpu().numpy()
+        sample_indices = range(len(activity_per_sample))
+        
+        plt.bar(sample_indices, activity_per_sample, alpha=0.7)
+        plt.xlabel('Sample Index')
+        plt.ylabel('Total Spike Activity')
+        plt.title('Network Activity per Sample')
+        plt.grid(True, alpha=0.3)
     plt.savefig(output_dir / "network_activity.png", dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -161,7 +162,7 @@ def basic_snn_example():
             import time
             cpu_start = time.time()
             
-            output, spikes = model.forward(sparse_x, duration=100.0, return_spikes=True)
+            output, states = model.forward(sparse_x)
             
             if end_time:
                 end_time.record()
@@ -170,29 +171,30 @@ def basic_snn_example():
             else:
                 gpu_time = time.time() - cpu_start
             
-            energy_metrics = model.compute_energy_consumption(spikes)
+            total_spikes = output.sum().item()
+            energy = states.get('energy_consumption', 0.0)
             
             results.append({
                 'sparsity': sparsity,
                 'execution_time': gpu_time,
-                'total_spikes': sum(s.sum().item() for s in spikes),
-                'energy_efficiency': energy_metrics['energy_efficiency'],
-                'theoretical_speedup': energy_metrics['theoretical_speedup']
+                'total_spikes': total_spikes,
+                'energy_consumption': energy,
+                'network_sparsity': states.get('sparsity', 0.0)
             })
     
     logger.info("Sparsity comparison results:")
     for result in results:
         logger.info(f"  Sparsity {result['sparsity']:.1f}: "
                    f"Time {result['execution_time']:.4f}s, "
-                   f"Spikes {result['total_spikes']}, "
-                   f"Speedup {result['theoretical_speedup']:.2f}x")
+                   f"Spikes {result['total_spikes']:.1f}, "
+                   f"Energy {result['energy_consumption']:.3f}mJ")
     
     logger.info("Basic spiking neural network example completed successfully!")
     
     return {
         'model': model,
         'results': results,
-        'spike_trains': spike_trains,
+        'network_states': network_states,
         'output': output
     }
 
@@ -202,7 +204,7 @@ def main():
     try:
         results = basic_snn_example()
         print("\n=== Example completed successfully! ===")
-        print(f"Generated {len(results['spike_trains'])} layer spike trains")
+        print(f"Network processed successfully with {len(results['results'])} sparsity tests")
         print(f"Final output shape: {results['output'].shape}")
         print("Check 'outputs/' directory for visualizations")
         

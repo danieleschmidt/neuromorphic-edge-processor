@@ -1,0 +1,225 @@
+# Neuromorphic Edge Processor - Kubernetes Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neuromorphic-edge-processor
+  namespace: neuromorphic
+  labels:
+    app: neuromorphic-edge-processor
+    version: v0.1.0
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: neuromorphic-edge-processor
+  template:
+    metadata:
+      labels:
+        app: neuromorphic-edge-processor
+        version: v0.1.0
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: neuromorphic-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      
+      containers:
+      - name: neuromorphic-api
+        image: ghcr.io/danieleschmidt/neuromorphic-edge-processor:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        env:
+        - name: NEUROMORPHIC_LOG_LEVEL
+          value: "INFO"
+        - name: NEUROMORPHIC_ENVIRONMENT
+          value: "production"
+        - name: NEUROMORPHIC_OUTPUT_DIR
+          value: "/app/outputs"
+        - name: NEUROMORPHIC_DATA_DIR
+          value: "/app/data"
+        - name: OMP_NUM_THREADS
+          value: "4"
+        - name: MKL_NUM_THREADS
+          value: "4"
+        
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+            ephemeral-storage: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+            ephemeral-storage: 1Gi
+        
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import src.models.spiking_neural_network; print('Healthy')"
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import src.models.spiking_neural_network; print('Ready')"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        volumeMounts:
+        - name: data-volume
+          mountPath: /app/data
+          readOnly: true
+        - name: outputs-volume
+          mountPath: /app/outputs
+        - name: logs-volume
+          mountPath: /app/logs
+        - name: temp-volume
+          mountPath: /tmp
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      
+      volumes:
+      - name: data-volume
+        configMap:
+          name: neuromorphic-data-config
+      - name: outputs-volume
+        persistentVolumeClaim:
+          claimName: neuromorphic-outputs-pvc
+      - name: logs-volume
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: temp-volume
+        emptyDir:
+          sizeLimit: 500Mi
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - neuromorphic-edge-processor
+              topologyKey: kubernetes.io/hostname
+      
+      tolerations:
+      - key: "neuromorphic.ai/dedicated"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neuromorphic-edge-processor-service
+  namespace: neuromorphic
+  labels:
+    app: neuromorphic-edge-processor
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: neuromorphic-edge-processor
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: neuromorphic-data-config
+  namespace: neuromorphic
+data:
+  config.json: |
+    {
+      "model_configs": {
+        "snn_default": {
+          "layer_sizes": [784, 256, 128, 10],
+          "membrane_tau": 20.0,
+          "threshold": 1.0,
+          "learning_rate": 0.001
+        },
+        "lsm_default": {
+          "input_size": 50,
+          "reservoir_size": 1000,
+          "output_size": 10,
+          "spectral_radius": 0.95
+        }
+      },
+      "security": {
+        "max_input_size_mb": 100,
+        "max_neurons": 100000,
+        "max_time_steps": 10000
+      }
+    }
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neuromorphic-outputs-pvc
+  namespace: neuromorphic
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neuromorphic-service-account
+  namespace: neuromorphic
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: neuromorphic
+  labels:
+    name: neuromorphic
+    security.istio.io/tlsMode: istio
