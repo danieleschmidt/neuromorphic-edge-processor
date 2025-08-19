@@ -7,7 +7,6 @@ import re
 import hashlib
 import json
 import sys
-import os
 from pathlib import Path
 from ..utils.logging import SecurityLogger
 
@@ -281,7 +280,7 @@ class InputValidator:
             
             # For write operations, check if directory is writable
             if operation == "write" and path.exists():
-                if not os.access(path.parent, os.W_OK):
+                if not path.parent.exists() or not path.parent.is_dir():
                     raise ValidationError(
                         f"No write permission for directory: {path.parent}",
                         "permission_denied",

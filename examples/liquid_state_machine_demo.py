@@ -27,10 +27,10 @@ def lsm_demo():
         input_size=50,
         reservoir_size=1000,
         output_size=10,
-        connection_prob=0.1,
         spectral_radius=0.9,
         input_scaling=1.0,
-        dt=0.1
+        leak_rate=0.1,
+        connectivity=0.1
     )
     
     logger.info("Created LSM with 1000 reservoir neurons")
@@ -65,14 +65,14 @@ def lsm_demo():
             # Random pattern
             pattern = torch.randn(50, seq_length)
         
-        # Convert to spike trains (rate-based encoding)
-        spike_processor = SpikeProcessor()
-        rates = torch.clamp((pattern + 1) * 10, 0, 20)  # 0-20 Hz
-        spikes = spike_processor.encode_rate_to_spikes(
-            rates.unsqueeze(0), seq_length * 0.1, method="poisson"
-        )
+        # Convert to spike patterns (simple threshold encoding)
+        # Normalize pattern to [0, 1] range for spike probability
+        pattern_norm = (pattern - pattern.min()) / (pattern.max() - pattern.min() + 1e-8)
         
-        return spikes[0]  # Remove batch dimension
+        # Generate spikes based on pattern values as probabilities
+        spikes = torch.rand_like(pattern_norm) < pattern_norm
+        
+        return spikes.float()
     
     # Generate different temporal patterns
     patterns = {}
@@ -93,11 +93,13 @@ def lsm_demo():
         logger.info(f"  Processing {pattern_name}...")
         
         with torch.no_grad():
-            output, states = lsm.forward(pattern.unsqueeze(0), return_states=True)
+            # Reshape pattern for LSM: [seq_len, batch_size, input_size]
+            pattern_input = pattern.T.unsqueeze(1)  # [seq_len, 1, input_size]
+            output, info = lsm.forward(pattern_input)
             
             responses[pattern_name] = {
                 'output': output,
-                'states': states,
+                'info': info,
                 'input_pattern': pattern
             }
     
@@ -105,37 +107,33 @@ def lsm_demo():
     logger.info("Analyzing reservoir dynamics...")
     
     for pattern_name, response in responses.items():
-        states = response['states']
-        dynamics = lsm.compute_reservoir_dynamics(states)
+        info = response['info']
         
         logger.info(f"  {pattern_name} dynamics:")
-        logger.info(f"    Mean activity: {dynamics['mean_reservoir_activity']:.4f}")
-        logger.info(f"    Activity variance: {dynamics['activity_variance']:.4f}")
-        logger.info(f"    Effective dimensionality: {dynamics.get('effective_dimensionality', 0):.2f}")
-        
-        if 'mean_separation' in dynamics:
-            logger.info(f"    Mean separation: {dynamics['mean_separation']:.4f}")
+        logger.info(f"    Reservoir activity: {info['reservoir_activity']:.4f}")
+        logger.info(f"    State norm: {info['state_norm']:.4f}")
+        logger.info(f"    Sparsity: {info['sparsity']:.3f}")
+        logger.info(f"    Complexity: {info['complexity']:.4f}")
+        logger.info(f"    Memory capacity: {info['memory_capacity']:.4f}")
     
     # Memory capacity analysis
     logger.info("Analyzing memory capacity...")
     
     memory_test_pattern = patterns["sine_wave"]
-    memory_analysis = lsm.analyze_memory_capacity(
-        memory_test_pattern.unsqueeze(0), max_delay=50
-    )
+    # Get average memory capacity from responses
+    avg_memory_capacity = sum(r['info']['memory_capacity'] for r in responses.values()) / len(responses)
     
     logger.info("Memory capacity analysis:")
-    logger.info(f"  Total memory capacity: {memory_analysis['total_memory_capacity']:.3f}")
-    logger.info(f"  Max effective delay: {memory_analysis['max_effective_delay']} time steps")
+    logger.info(f"  Average memory capacity: {avg_memory_capacity:.3f}")
+    logger.info(f"  Reservoir complexity: {responses['sine_wave']['info']['complexity']:.3f}")
     
-    # Computational task benchmarking
-    logger.info("Benchmarking computational tasks...")
+    # Simple computational analysis
+    logger.info("Analyzing computational capabilities...")
     
-    input_sequences = [pattern.unsqueeze(0) for pattern in patterns.values()]
-    task_results = lsm.benchmark_computational_tasks(input_sequences)
-    
-    for task, results in task_results.items():
-        logger.info(f"  {task}: {results['mean_performance']:.4f} ± {results['std_performance']:.4f}")
+    for pattern_name, response in responses.items():
+        output_variance = response['output'].var().item()
+        output_mean = response['output'].mean().item()
+        logger.info(f"  {pattern_name} output: mean={output_mean:.4f}, var={output_variance:.4f}")
     
     # Readout training demonstration
     logger.info("Demonstrating readout training...")
@@ -157,14 +155,29 @@ def lsm_demo():
     
     logger.info(f"Generated {len(train_sequences)} training sequences")
     
-    # Train readout
-    training_history = lsm.train_readout(
-        train_sequences, train_targets, 
-        learning_rate=0.01, epochs=50
-    )
+    # Train readout (simplified for demonstration)
+    optimizer = torch.optim.Adam(lsm.readout.parameters(), lr=0.01)
+    criterion = torch.nn.MSELoss()
     
-    final_loss = training_history['training_losses'][-1]
-    logger.info(f"Readout training completed. Final loss: {final_loss:.6f}")
+    training_losses = []
+    for epoch in range(50):
+        total_loss = 0.0
+        for seq, target in zip(train_sequences, train_targets):
+            seq_input = seq.transpose(0, 2).transpose(1, 2)  # Reshape to [seq, batch, input]
+            output, _ = lsm.forward(seq_input, reset_state=True)
+            final_output = output[-1]  # Last timestep output
+            
+            loss = criterion(final_output, target)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        
+        training_losses.append(total_loss / len(train_sequences))
+        if epoch % 10 == 0:
+            logger.info(f"  Epoch {epoch}: Loss = {training_losses[-1]:.6f}")
+    
+    logger.info(f"Readout training completed. Final loss: {training_losses[-1]:.6f}")
     
     # Test trained LSM
     logger.info("Testing trained LSM...")
@@ -172,8 +185,10 @@ def lsm_demo():
     test_accuracy = 0.0
     for i, (pattern_name, pattern) in enumerate(patterns.items()):
         with torch.no_grad():
-            output = lsm.forward(pattern.unsqueeze(0))
-            predicted_class = torch.argmax(output, dim=1).item()
+            pattern_input = pattern.T.unsqueeze(1)
+            output, _ = lsm.forward(pattern_input, reset_state=True)
+            final_output = output[-1]  # Last timestep
+            predicted_class = torch.argmax(final_output, dim=1).item()
             
             correct = (predicted_class == i)
             test_accuracy += correct
@@ -197,33 +212,32 @@ def lsm_demo():
         if i >= 4:
             break
         
-        states = response['states'][0]  # First batch
-        time_axis = torch.arange(states.shape[-1]) * lsm.dt
+        # Use final reservoir state for visualization
+        final_state = response['info']['final_state']
+        state_2d = final_state.view(20, -1)  # Reshape for visualization
         
-        # Plot a subset of reservoir neurons
-        neuron_subset = states[:20]  # First 20 neurons
-        
-        axes[i].imshow(neuron_subset.cpu().numpy(), aspect='auto', cmap='viridis')
-        axes[i].set_title(f'Reservoir Activity: {pattern_name}')
-        axes[i].set_xlabel('Time Steps')
-        axes[i].set_ylabel('Neuron ID')
+        axes[i].imshow(state_2d.detach().cpu().numpy(), aspect='auto', cmap='viridis')
+        axes[i].set_title(f'Reservoir State: {pattern_name}')
+        axes[i].set_xlabel('State Dimension')
+        axes[i].set_ylabel('Neuron Group')
     
     plt.tight_layout()
     plt.savefig(output_dir / "lsm_reservoir_activity.png", dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Plot memory capacity
-    if memory_analysis['delay_capacities']:
-        delays, capacities = zip(*memory_analysis['delay_capacities'])
-        
-        plt.figure(figsize=(10, 6))
-        plt.plot(delays, capacities, 'o-', linewidth=2, markersize=6)
-        plt.xlabel('Delay (time steps)')
-        plt.ylabel('Memory Capacity')
-        plt.title('LSM Memory Capacity vs Delay')
-        plt.grid(True, alpha=0.3)
-        plt.savefig(output_dir / "lsm_memory_capacity.png", dpi=300, bbox_inches='tight')
-        plt.close()
+    # Plot memory capacity comparison
+    memory_capacities = [r['info']['memory_capacity'] for r in responses.values()]
+    pattern_names = list(responses.keys())
+    
+    plt.figure(figsize=(10, 6))
+    plt.bar(pattern_names, memory_capacities, alpha=0.7)
+    plt.xlabel('Pattern Type')
+    plt.ylabel('Memory Capacity')
+    plt.title('LSM Memory Capacity by Pattern Type')
+    plt.xticks(rotation=45)
+    plt.grid(True, alpha=0.3)
+    plt.savefig(output_dir / "lsm_memory_capacity.png", dpi=300, bbox_inches='tight')
+    plt.close()
     
     # Plot input patterns
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
@@ -235,7 +249,6 @@ def lsm_demo():
         
         # Show first 10 input channels
         input_subset = pattern[:10]
-        time_axis = torch.arange(pattern.shape[-1]) * lsm.dt
         
         axes[i].imshow(input_subset.cpu().numpy(), aspect='auto', cmap='RdBu_r')
         axes[i].set_title(f'Input Pattern: {pattern_name}')
@@ -248,7 +261,7 @@ def lsm_demo():
     
     # Training loss plot
     plt.figure(figsize=(10, 6))
-    plt.plot(training_history['training_losses'])
+    plt.plot(training_losses)
     plt.xlabel('Epoch')
     plt.ylabel('Training Loss')
     plt.title('LSM Readout Training Progress')
@@ -262,9 +275,9 @@ def lsm_demo():
     logger.info("Performance analysis summary:")
     logger.info(f"  Patterns processed: {len(patterns)}")
     logger.info(f"  Reservoir neurons: {lsm.reservoir_size}")
-    logger.info(f"  Memory capacity: {memory_analysis['total_memory_capacity']:.3f}")
+    logger.info(f"  Average memory capacity: {avg_memory_capacity:.3f}")
     logger.info(f"  Classification accuracy: {test_accuracy:.2%}")
-    logger.info(f"  Training convergence: {len(training_history['training_losses'])} epochs")
+    logger.info(f"  Training epochs: {len(training_losses)} epochs")
     
     logger.info("Liquid State Machine demonstration completed successfully!")
     
@@ -272,8 +285,8 @@ def lsm_demo():
         'lsm': lsm,
         'patterns': patterns,
         'responses': responses,
-        'memory_analysis': memory_analysis,
-        'task_results': task_results,
+        'avg_memory_capacity': avg_memory_capacity,
+        'training_losses': training_losses,
         'test_accuracy': test_accuracy
     }
 
@@ -284,7 +297,7 @@ def main():
         results = lsm_demo()
         print("\n=== LSM demonstration completed successfully! ===")
         print(f"Processed {len(results['patterns'])} temporal patterns")
-        print(f"Memory capacity: {results['memory_analysis']['total_memory_capacity']:.3f}")
+        print(f"Average memory capacity: {results['avg_memory_capacity']:.3f}")
         print(f"Classification accuracy: {results['test_accuracy']:.2%}")
         print("Check 'outputs/' directory for visualizations")
         
