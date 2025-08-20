@@ -1,0 +1,56 @@
+{
+  "deployment_summary": {
+    "status": "failed",
+    "start_time": 1755722470.3359559,
+    "duration_seconds": 0.0005435943603515625,
+    "total_steps": 1,
+    "successful_steps": 0,
+    "failed_steps": 1
+  },
+  "deployment_steps": [
+    {
+      "name": "pre_deployment_validation",
+      "status": "failed",
+      "duration": 9.918212890625e-05,
+      "error": "'python_version'",
+      "timestamp": 1755722470.336375
+    }
+  ],
+  "environment_info": {
+    "python_version": "3.12.3",
+    "platform": "linux",
+    "deployment_path": "/root/repo"
+  },
+  "configuration": {
+    "name": "neuromorphic-edge-processor",
+    "version": "1.0.0",
+    "target": "LOCAL",
+    "environment": "production",
+    "cpu_cores": 2.0,
+    "memory_gb": 2.0,
+    "gpu_required": false,
+    "storage_gb": 5.0,
+    "ports": [
+      8080,
+      8081
+    ],
+    "health_check_endpoint": "/health",
+    "metrics_endpoint": "/metrics",
+    "min_replicas": 1,
+    "max_replicas": 3,
+    "auto_scaling_enabled": true,
+    "enable_tls": false,
+    "secrets_path": null,
+    "security_scan_required": false,
+    "enable_logging": true,
+    "log_level": "INFO",
+    "enable_metrics": true,
+    "enable_tracing": false
+  },
+  "recommendations": [
+    "\u274c Deployment failed - check logs for details",
+    "\ud83d\udd27 Review failed steps in deployment report",
+    "\ud83d\udccb Ensure all dependencies are available",
+    "\ud83d\udd12 Verify system meets security requirements"
+  ]
+}
