@@ -1,32 +1,19 @@
-"""Security manager for neuromorphic computing operations."""
+"""Enhanced security manager for neuromorphic computing operations."""
 
 import torch
 import numpy as np
 import hashlib
 import logging
 import time
+import psutil
+import threading
 from typing import Dict, List, Optional, Tuple, Any, Union
 from functools import wraps
 from dataclasses import dataclass
 from pathlib import Path
-
-
-@dataclass
-class SecurityConfig:
-    """Security configuration settings."""
-    max_input_size: int = 10000
-    max_sequence_length: int = 5000
-    max_memory_mb: float = 1000.0
-    allowed_dtypes: List[str] = None
-    enable_input_sanitization: bool = True
-    enable_output_validation: bool = True
-    rate_limit_requests: int = 1000
-    rate_limit_window: int = 3600
-    log_security_events: bool = True
-    
-    def __post_init__(self):
-        if self.allowed_dtypes is None:
-            self.allowed_dtypes = ['float32', 'float64', 'int32', 'int64']
+from .security_config import SecurityConfig, security_config
+from .input_validator import InputValidator, ValidationError
+from .resource_monitor import ResourceMonitor
 
 
 class SecurityManager:
@@ -42,11 +29,27 @@ class SecurityManager:
         Args:
             config: Security configuration settings
         """
-        self.config = config if config is not None else SecurityConfig()
+        self.config = config if config is not None else security_config
         self.logger = self._setup_logger()
+        self.input_validator = InputValidator(
+            max_input_size_mb=self.config.max_input_size_mb,
+            max_neurons=self.config.max_neurons,
+            max_time_steps=self.config.max_time_steps,
+            enable_content_filtering=self.config.enable_content_filtering,
+            log_violations=self.config.log_security_violations
+        )
         
         # Rate limiting
         self.request_history: Dict[str, List[float]] = {}
+        self.rate_limit_lock = threading.Lock()
+        
+        # Resource monitoring
+        self.resource_monitor = ResourceMonitor(self.config)
+        
+        # Security event tracking
+        self.security_events = []
+        self.blocked_operations = 0
+        self.total_operations = 0
         
         # Memory tracking
         self.memory_usage_history: List[float] = []

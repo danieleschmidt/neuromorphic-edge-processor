@@ -1,5 +1,5 @@
 {
-  "timestamp": 1755633192.3877194,
+  "timestamp": 1755722353.0975769,
   "overall_status": "EXCELLENT",
   "gates": {
     "Code Structure": {
@@ -55,8 +55,8 @@
           "score": 30
         },
         "code_metrics": {
-          "total_python_files": 71,
-          "lines_of_code": 22976,
+          "total_python_files": 77,
+          "lines_of_code": 24554,
           "has_docstrings": true
         }
       }
@@ -203,14 +203,15 @@
       "status": "FAIL",
       "details": {
         "example_files": {
-          "count": 6,
+          "count": 7,
           "files": [
             "__init__.py",
             "basic_spiking_network.py",
             "health_monitoring_demo.py",
             "liquid_state_machine_demo.py",
             "neuromorphic_demo.py",
-            "performance_optimization_demo.py"
+            "performance_optimization_demo.py",
+            "secure_neuromorphic_demo.py"
           ]
         },
         "key_examples": {

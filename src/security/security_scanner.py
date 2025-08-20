@@ -4,7 +4,7 @@ import ast
 import re
 import hashlib
 import logging
-from typing import Dict, List, Any, Set, Optional, Tuple
+from typing import Dict, List, Any, Set, Optional, Tuple, Union
 from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
@@ -147,8 +147,8 @@ class SecurityScanner:
                 elif isinstance(node, ast.ImportFrom):
                     violations.extend(self._check_import_from(node, file_path, lines))
                 
-                # Check string literals for injection patterns
-                elif isinstance(node, ast.Str):
+                # Check string literals for injection patterns (support both ast.Str and ast.Constant)
+                elif isinstance(node, (ast.Str, ast.Constant)) and isinstance(getattr(node, 's', getattr(node, 'value', None)), str):
                     violations.extend(self._check_string_literal(node, file_path, lines))
                 
                 # Check attribute access
@@ -244,14 +244,22 @@ class SecurityScanner:
         
         return violations
     
-    def _check_string_literal(self, node: ast.Str, file_path: Path, lines: List[str]) -> List[SecurityViolation]:
+    def _check_string_literal(self, node: Union[ast.Str, ast.Constant], file_path: Path, lines: List[str]) -> List[SecurityViolation]:
         """Check string literals for injection patterns."""
         violations = []
         
-        if not hasattr(node, 's') or not isinstance(node.s, str):
+        # Handle both ast.Str (deprecated) and ast.Constant (new)
+        if hasattr(node, 's'):
+            string_value = node.s
+        elif hasattr(node, 'value') and isinstance(node.value, str):
+            string_value = node.value
+        else:
             return violations
-        
-        string_value = node.s.lower()
+            
+        if not isinstance(string_value, str):
+            return violations
+            
+        string_value = string_value.lower()
         line_num = getattr(node, 'lineno', 1)
         code_snippet = lines[line_num - 1] if line_num <= len(lines) else ""
         
