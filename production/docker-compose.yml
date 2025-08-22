@@ -1,0 +1,106 @@
+# Neuromorphic Edge Processor - Docker Compose Configuration
+version: '3.8'
+
+services:
+  neuromorphic-api:
+    build: 
+      context: .
+      target: production
+    container_name: neuromorphic-edge-processor
+    restart: unless-stopped
+    
+    environment:
+      - NEUROMORPHIC_LOG_LEVEL=INFO
+      - NEUROMORPHIC_OUTPUT_DIR=/app/outputs
+      - NEUROMORPHIC_DATA_DIR=/app/data
+      - NEUROMORPHIC_ENVIRONMENT=production
+      - OMP_NUM_THREADS=4
+      - MKL_NUM_THREADS=4
+    
+    volumes:
+      - ./data:/app/data:ro
+      - ./outputs:/app/outputs:rw
+      - ./logs:/app/logs:rw
+    
+    ports:
+      - "8080:8080"
+    
+    networks:
+      - neuromorphic-net
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import src.models.spiking_neural_network; print('Healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  neuromorphic-monitoring:
+    build: 
+      context: .
+      target: production
+    container_name: neuromorphic-monitoring
+    restart: unless-stopped
+    
+    command: ["python", "-m", "src.monitoring.health_monitor", "--daemon"]
+    
+    environment:
+      - NEUROMORPHIC_LOG_LEVEL=INFO
+      - NEUROMORPHIC_MONITORING_INTERVAL=30
+    
+    volumes:
+      - ./logs:/app/logs:rw
+      - ./outputs:/app/outputs:ro
+    
+    networks:
+      - neuromorphic-net
+    
+    depends_on:
+      - neuromorphic-api
+
+  neuromorphic-benchmarks:
+    build: 
+      context: .
+      target: production  
+    container_name: neuromorphic-benchmarks
+    restart: "no"
+    
+    command: ["python", "-m", "benchmarks.cli", "--run-suite", "--output-dir", "/app/outputs"]
+    
+    environment:
+      - NEUROMORPHIC_LOG_LEVEL=INFO
+      - NEUROMORPHIC_BENCHMARK_MODE=production
+    
+    volumes:
+      - ./outputs:/app/outputs:rw
+      - ./data:/app/data:ro
+    
+    networks:
+      - neuromorphic-net
+    
+    depends_on:
+      - neuromorphic-api
+
+networks:
+  neuromorphic-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  neuromorphic-data:
+    driver: local
+  neuromorphic-outputs:
+    driver: local
+  neuromorphic-logs:
+    driver: local

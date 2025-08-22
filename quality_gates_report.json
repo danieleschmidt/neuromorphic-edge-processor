@@ -1,0 +1,126 @@
+{
+  "overall_status": "FAILED",
+  "overall_score": 0.8376923076923077,
+  "execution_time_ms": 53301.212549209595,
+  "timestamp": "2025-08-22T00:28:02.372076",
+  "generation": "Generation 3 (Optimized)",
+  "gates": [
+    {
+      "name": "Functional Tests",
+      "status": "FAILED",
+      "score": 0.4,
+      "details": {
+        "generation_1": {
+          "status": "PASSED",
+          "output": "r...\n   \u2705 Encoded spike trains shape: torch.Size([2, 3, 100])\n   \u2705 Total spikes generated: 11.0\n   \u2705 Mean firing rate: 18.33 Hz\n   \u2705 Sparsity: 0.982\n\n\ud83e\uddea Testing Data Loader...\n   \u2705 Created dataset with 30 samples\n   \u2705 Dataset classes: 3\n   \u2705 Sparsity: 0.97133203125\n   \u2705 Sample shape: torch.Size([128, 1000]), Target: 0\n\n================================================================================\n\u2705 5/5 tests passed\n\ud83c\udf89 All basic functionality tests passed! Generation 1 implementation successful.\n",
+          "errors": ""
+        },
+        "generation_2": {
+          "status": "FAILED",
+          "output": "orrectly rejected invalid parameters\nINFO: Initialized robust LIF neuron with 5 neurons\n   \u2705 Valid parameters accepted\n   \u2705 Handled zero input\n   \u2705 Handled NaN input with recovery\n\n\u26a1 Testing Circuit Breaker...\n   \u2705 Circuit breaker triggered after 3 failures\n   \u2705 Circuit breaker correctly blocking calls\n\n==========================================================================================\n\u2705 6/7 robust functionality tests passed\n\u26a0\ufe0f  Some tests failed. Generation 2 implementation needs fixes.\n",
+          "errors": "e_train: '>' not supported between instances of 'RobustLIFNeuron' and 'int'\nError in get_spike_train: unknown - '>' not supported between instances of 'RobustLIFNeuron' and 'int'\nInput shapes: {}\nAll retry attempts exhausted for get_spike_train\n/root/repo/src/security/input_sanitizer.py:347: UserWarning: Input sanitization warning in forward: Replaced NaN values in arg_1 with 0.0\n  warnings.warn(f\"Input sanitization warning in {func.__name__}: {warning}\")\nCircuit breaker opened after 2 failures\n"
+        },
+        "generation_3": {
+          "status": "FAILED",
+          "output": "IF neuron with 10 neurons\nINFO: JIT compilation completed in 0.001s\nINFO: Initialized optimized LIF neuron with 10 neurons\n\u2713 Test 8: Performance target monitoring - PASSED\n\n============================================================\nGENERATION 3 CORE TESTS: 5/8 PASSED (62.5%)\n\u26a0\ufe0f  Only 62.5% tests passed - need \u226580% for validation\n============================================================\nGENERATION 3 VALIDATION: \u274c NEEDS IMPROVEMENT\n============================================================\n",
+          "errors": ""
+        }
+      },
+      "execution_time_ms": 43040.247678756714,
+      "critical": true
+    },
+    {
+      "name": "Security Validation",
+      "status": "PASSED",
+      "score": 0.7,
+      "details": {
+        "security_module_src/security/__init__.py": "EXISTS",
+        "security_module_src/security/input_sanitizer.py": "EXISTS",
+        "security_module_src/utils/robust_error_handling.py": "EXISTS",
+        "input_sanitizer": "FUNCTIONAL",
+        "error_handling": "ERROR: name 'RecoveryManager' is not defined"
+      },
+      "execution_time_ms": 2752.3481845855713,
+      "critical": true
+    },
+    {
+      "name": "Performance Benchmarks",
+      "status": "PASSED",
+      "score": 0.8500000000000001,
+      "details": {
+        "performance_test": {
+          "avg_latency_ms": 15.98177194595337,
+          "throughput_hz": 62.57128454728093,
+          "jit_enabled": true,
+          "iterations": 100
+        }
+      },
+      "execution_time_ms": 3911.1621379852295,
+      "critical": true
+    },
+    {
+      "name": "Code Quality",
+      "status": "PASSED",
+      "score": 1.0,
+      "details": {
+        "module_structure": "4/4 modules exist",
+        "documentation": "Classes have docstrings",
+        "type_hints": "Type hints present"
+      },
+      "execution_time_ms": 0.5877017974853516,
+      "critical": false
+    },
+    {
+      "name": "Documentation",
+      "status": "PASSED",
+      "score": 0.99,
+      "details": {
+        "README.md": "EXISTS",
+        "API_REFERENCE.md": "EXISTS",
+        "DEPLOYMENT_GUIDE.md": "EXISTS"
+      },
+      "execution_time_ms": 0.11539459228515625,
+      "critical": false
+    },
+    {
+      "name": "Integration Tests",
+      "status": "PASSED",
+      "score": 1.0,
+      "details": {
+        "basic_model": "INTEGRATION_OK",
+        "optimized_model": "INTEGRATION_OK",
+        "security_integration": "INTEGRATION_OK"
+      },
+      "execution_time_ms": 965.9979343414307,
+      "critical": true
+    },
+    {
+      "name": "Resource Limits",
+      "status": "PASSED",
+      "score": 1.0,
+      "details": {
+        "memory_usage": {
+          "initial_mb": 762.98828125,
+          "final_mb": 777.171875,
+          "increase_mb": 14.18359375
+        },
+        "cpu_usage_percent": 0.0
+      },
+      "execution_time_ms": 2630.33127784729,
+      "critical": true
+    },
+    {
+      "name": "Deployment Readiness",
+      "status": "PASSED",
+      "score": 1.0,
+      "details": {
+        "requirements.txt": "EXISTS",
+        "setup.py": "EXISTS",
+        "Dockerfile": "EXISTS",
+        "deploy.sh": "EXISTS"
+      },
+      "execution_time_ms": 0.18548965454101562,
+      "critical": false
+    }
+  ]
+}
