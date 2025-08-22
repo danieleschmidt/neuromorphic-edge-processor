@@ -1,0 +1,27 @@
+{
+  "dashboard": {
+    "title": "Neuromorphic Edge Processor",
+    "panels": [
+      {
+        "title": "Spike Generation Rate",
+        "type": "graph",
+        "metric": "neuromorphic_spikes_per_second"
+      },
+      {
+        "title": "JIT Compilation Performance",
+        "type": "graph",
+        "metric": "neuromorphic_jit_speedup"
+      },
+      {
+        "title": "Memory Usage",
+        "type": "graph",
+        "metric": "neuromorphic_memory_usage_mb"
+      },
+      {
+        "title": "Security Events",
+        "type": "table",
+        "metric": "neuromorphic_security_events_total"
+      }
+    ]
+  }
+}

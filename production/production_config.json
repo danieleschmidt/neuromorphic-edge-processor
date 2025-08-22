@@ -1,0 +1,24 @@
+{
+  "application": {
+    "name": "neuromorphic-edge-processor",
+    "version": "3.0.0",
+    "environment": "production",
+    "debug": false
+  },
+  "neuromorphic": {
+    "default_neurons": 100,
+    "enable_jit": true,
+    "enable_caching": true,
+    "performance_monitoring": true
+  },
+  "security": {
+    "input_validation": true,
+    "rate_limiting": true,
+    "audit_logging": true
+  },
+  "deployment": {
+    "container_port": 8080,
+    "health_check_path": "/health",
+    "metrics_path": "/metrics"
+  }
+}
