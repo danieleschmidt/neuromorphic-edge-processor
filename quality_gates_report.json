@@ -1,0 +1,159 @@
+{
+  "total_gates": 6,
+  "passed_gates": 0,
+  "failed_gates": 1,
+  "warnings": 0,
+  "errors": 5,
+  "skipped": 0,
+  "overall_score": 0.0,
+  "overall_status": "error",
+  "execution_time": 0.014961004257202148,
+  "timestamp": 1755818317.3138618,
+  "results": [
+    {
+      "gate_name": "core_functionality",
+      "category": "functionality",
+      "status": "fail",
+      "score": 0,
+      "message": "Core functionality tests failed",
+      "details": {
+        "core_imports": "failed: No module named 'numpy'",
+        "neuron_functionality": "failed: cannot access local variable 'PurePythonLIFNeuron' where it is not associated with a value",
+        "network_functionality": "failed: cannot access local variable 'PurePythonSpikingNetwork' where it is not associated with a value",
+        "lsm_functionality": "failed: cannot access local variable 'PurePythonLiquidStateMachine' where it is not associated with a value"
+      },
+      "execution_time": 0.0007605552673339844,
+      "timestamp": 1755818317.2996774,
+      "requirements": [
+        "Core models must be importable",
+        "Basic operations must work"
+      ],
+      "recommendations": [
+        "Fix core model imports",
+        "Fix neuron implementation",
+        "Fix network implementation",
+        "Fix LSM implementation"
+      ]
+    },
+    {
+      "gate_name": "model_factory",
+      "category": "functionality",
+      "status": "error",
+      "score": 0,
+      "message": "Model factory testing failed: No module named 'numpy'",
+      "details": {
+        "error": "No module named 'numpy'"
+      },
+      "execution_time": 0.0004963874816894531,
+      "timestamp": 1755818317.3001997,
+      "requirements": [
+        "Model factory must create all model types",
+        "Factory must handle missing dependencies gracefully"
+      ],
+      "recommendations": []
+    },
+    {
+      "gate_name": "security_implementation",
+      "category": "security",
+      "status": "error",
+      "score": 0,
+      "message": "Security validation failed: No module named 'numpy'",
+      "details": {
+        "error": "No module named 'numpy'"
+      },
+      "execution_time": 0.005270481109619141,
+      "timestamp": 1755818317.305486,
+      "requirements": [
+        "Security scanner must be functional",
+        "Input validation must work",
+        "Authentication must be implemented"
+      ],
+      "recommendations": []
+    },
+    {
+      "gate_name": "security_scanning",
+      "category": "security",
+      "status": "error",
+      "score": 0,
+      "message": "Security scanning validation failed: No module named 'numpy'",
+      "details": {
+        "error": "No module named 'numpy'"
+      },
+      "execution_time": 0.0005970001220703125,
+      "timestamp": 1755818317.3061001,
+      "requirements": [
+        "Security scanner must detect threats",
+        "Scanner must classify threat levels"
+      ],
+      "recommendations": []
+    },
+    {
+      "gate_name": "core_performance",
+      "category": "performance",
+      "status": "error",
+      "score": 0,
+      "message": "Performance benchmarking failed: No module named 'numpy'",
+      "details": {
+        "error": "No module named 'numpy'"
+      },
+      "execution_time": 0.0005285739898681641,
+      "timestamp": 1755818317.3066428,
+      "requirements": [
+        "Core operations must meet performance thresholds",
+        "Memory usage must be reasonable"
+      ],
+      "recommendations": []
+    },
+    {
+      "gate_name": "optimization_features",
+      "category": "performance",
+      "status": "error",
+      "score": 0,
+      "message": "Optimization benchmarking failed: No module named 'torch'",
+      "details": {
+        "error": "No module named 'torch'"
+      },
+      "execution_time": 0.0067441463470458984,
+      "timestamp": 1755818317.3134003,
+      "requirements": [
+        "Optimization features must provide speedup",
+        "Caching must improve performance"
+      ],
+      "recommendations": []
+    }
+  ],
+  "summary": {
+    "pass_rate": 0.0,
+    "categories": {
+      "functionality": {
+        "score": 0.0,
+        "status": "fail",
+        "count": 2
+      },
+      "security": {
+        "score": 0.0,
+        "status": "error",
+        "count": 2
+      },
+      "performance": {
+        "score": 0.0,
+        "status": "error",
+        "count": 2
+      }
+    },
+    "top_recommendations": [
+      "Fix core model imports",
+      "Fix neuron implementation",
+      "Fix network implementation",
+      "Fix LSM implementation"
+    ],
+    "critical_issues": [
+      "core_functionality: Core functionality tests failed",
+      "model_factory: Model factory testing failed: No module named 'numpy'",
+      "security_implementation: Security validation failed: No module named 'numpy'",
+      "security_scanning: Security scanning validation failed: No module named 'numpy'",
+      "core_performance: Performance benchmarking failed: No module named 'numpy'",
+      "optimization_features: Optimization benchmarking failed: No module named 'torch'"
+    ]
+  }
+}
