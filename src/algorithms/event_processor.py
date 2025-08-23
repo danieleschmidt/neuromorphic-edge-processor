@@ -4,7 +4,6 @@ This module implements efficient event-driven processing algorithms
 optimized for sparse neural activity and low-power edge devices.
 """
 
-import torch
 import numpy as np
 from typing import List, Dict, Optional, Tuple, Union
 from dataclasses import dataclass
