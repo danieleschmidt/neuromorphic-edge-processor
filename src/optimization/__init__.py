@@ -1,11 +1,8 @@
 """Performance optimization modules for neuromorphic computing."""
 
-from .performance_optimizer import PerformanceOptimizer, OptimizationResult
-from .adaptive_cache import AdaptiveCache, CachePolicy
+from .advanced_performance_optimizer import PerformanceOptimizer, performance_optimizer
 
 __all__ = [
     "PerformanceOptimizer",
-    "OptimizationResult",
-    "AdaptiveCache",
-    "CachePolicy",
+    "performance_optimizer",
 ]

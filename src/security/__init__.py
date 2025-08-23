@@ -1,8 +1,8 @@
 """Minimal security module for testing."""
 
-from .input_sanitizer import InputSanitizer, global_sanitizer
+from .comprehensive_security import SecurityValidator, security_validator
 
 __all__ = [
-    "InputSanitizer",
-    "global_sanitizer",
+    "SecurityValidator",
+    "security_validator",
 ]
