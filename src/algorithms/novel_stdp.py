@@ -1,4 +1,4 @@
-"""Novel STDP algorithms based on 2024-2025 research advances."""
+"""Novel STDP algorithms based on 2024-2025 research advances with multi-timescale plasticity."""
 
 import torch
 import torch.nn as nn
@@ -20,6 +20,13 @@ class STDPConfig:
     learning_rate: float = 0.001
     stabilization_factor: float = 0.1
     competitive_factor: float = 0.5
+    
+    # Multi-timescale parameters (2024-2025 research)
+    short_term_tau: float = 5.0
+    medium_term_tau: float = 50.0
+    long_term_tau: float = 500.0
+    homeostatic_tau: float = 10000.0
+    metaplasticity_rate: float = 0.001
 
 
 class StabilizedSupervisedSTDP:
@@ -538,3 +545,270 @@ class CompetitiveSTDP:
             "total_activations": self.class_activations.sum().item(),
             "most_active_class": torch.argmax(self.class_activations).item(),
         }
+
+
+class MultiTimescaleSTDP:
+    """Multi-timescale plasticity implementation based on 2024-2025 research.
+    
+    Implements overlapping plasticity mechanisms across multiple time scales
+    for enhanced learning stability and generalization.
+    """
+    
+    def __init__(self, config: STDPConfig):
+        """Initialize multi-timescale STDP.
+        
+        Args:
+            config: STDP configuration with multi-timescale parameters
+        """
+        self.config = config
+        
+        # Multi-timescale traces
+        self.short_term_traces = None
+        self.medium_term_traces = None
+        self.long_term_traces = None
+        self.homeostatic_traces = None
+        
+        # Adaptive learning rates
+        self.meta_learning_rates = None
+        self.activity_history = None
+        
+        # Statistics
+        self.plasticity_events = {"short": 0, "medium": 0, "long": 0, "homeostatic": 0}
+    
+    def initialize_traces(self, batch_size: int, num_pre: int, num_post: int, device: str = "cpu"):
+        """Initialize multi-timescale traces."""
+        self.short_term_traces = torch.zeros(batch_size, num_pre, device=device)
+        self.medium_term_traces = torch.zeros(batch_size, num_pre, device=device)
+        self.long_term_traces = torch.zeros(batch_size, num_pre, device=device)
+        self.homeostatic_traces = torch.zeros(batch_size, num_post, device=device)
+        
+        # Meta-plasticity learning rates
+        self.meta_learning_rates = torch.ones(num_pre, num_post, device=device)
+        self.activity_history = torch.zeros(num_post, device=device)
+    
+    def update_multi_timescale_traces(self, pre_spikes: torch.Tensor, post_spikes: torch.Tensor):
+        """Update traces across multiple timescales."""
+        if self.short_term_traces is None:
+            return
+        
+        # Short-term plasticity (fast adaptation)
+        alpha_short = torch.exp(torch.tensor(-1.0 / self.config.short_term_tau))
+        self.short_term_traces = alpha_short * self.short_term_traces + pre_spikes
+        
+        # Medium-term plasticity (working memory)
+        alpha_medium = torch.exp(torch.tensor(-1.0 / self.config.medium_term_tau))
+        self.medium_term_traces = alpha_medium * self.medium_term_traces + pre_spikes
+        
+        # Long-term plasticity (consolidation)
+        alpha_long = torch.exp(torch.tensor(-1.0 / self.config.long_term_tau))
+        self.long_term_traces = alpha_long * self.long_term_traces + pre_spikes
+        
+        # Homeostatic traces (maintain activity balance)
+        alpha_homeostatic = torch.exp(torch.tensor(-1.0 / self.config.homeostatic_tau))
+        self.homeostatic_traces = alpha_homeostatic * self.homeostatic_traces + post_spikes
+        
+        # Update activity history for meta-plasticity
+        self.activity_history = 0.99 * self.activity_history + 0.01 * post_spikes.mean(dim=0)
+    
+    def compute_adaptive_learning_rates(self) -> torch.Tensor:
+        """Compute adaptive learning rates based on recent activity."""
+        if self.activity_history is None:
+            return self.meta_learning_rates
+        
+        # Meta-plasticity: adjust learning rates based on recent activity
+        target_activity = 0.1  # Target firing rate
+        activity_error = torch.abs(self.activity_history - target_activity)
+        
+        # Increase learning rate for neurons far from target activity
+        adaptation_factor = 1.0 + self.config.metaplasticity_rate * activity_error
+        
+        # Apply to all connections involving each post-synaptic neuron
+        adaptive_rates = self.meta_learning_rates * adaptation_factor.unsqueeze(0)
+        
+        return torch.clamp(adaptive_rates, 0.1, 10.0)  # Reasonable bounds
+    
+    def compute_multi_timescale_updates(self, post_spikes: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
+        """Compute weight updates across multiple timescales."""
+        if self.short_term_traces is None:
+            return torch.zeros_like(weights)
+        
+        device = weights.device
+        dw = torch.zeros_like(weights, device=device)
+        
+        # Get adaptive learning rates
+        adaptive_rates = self.compute_adaptive_learning_rates()
+        
+        batch_size = post_spikes.shape[0]
+        
+        # Short-term updates (fast learning)
+        if torch.any(post_spikes > 0):
+            short_corr = torch.einsum('bi,bj->ij', self.short_term_traces, post_spikes)
+            dw += 0.5 * adaptive_rates * short_corr / batch_size
+            self.plasticity_events["short"] += (short_corr > 0).sum().item()
+        
+        # Medium-term updates (working memory)
+        if torch.any(post_spikes > 0):
+            medium_corr = torch.einsum('bi,bj->ij', self.medium_term_traces, post_spikes)
+            dw += 0.3 * adaptive_rates * medium_corr / batch_size
+            self.plasticity_events["medium"] += (medium_corr > 0).sum().item()
+        
+        # Long-term updates (consolidation)
+        if torch.any(post_spikes > 0):
+            long_corr = torch.einsum('bi,bj->ij', self.long_term_traces, post_spikes)
+            dw += 0.2 * adaptive_rates * long_corr / batch_size
+            self.plasticity_events["long"] += (long_corr > 0).sum().item()
+        
+        # Homeostatic plasticity (activity regulation)
+        homeostatic_target = 0.1
+        activity_excess = self.homeostatic_traces.mean(dim=0) - homeostatic_target
+        if torch.any(torch.abs(activity_excess) > 0.05):
+            # Reduce weights for over-active neurons, increase for under-active
+            homeostatic_adjustment = -0.01 * activity_excess.unsqueeze(0)
+            dw += homeostatic_adjustment
+            self.plasticity_events["homeostatic"] += torch.sum(torch.abs(activity_excess) > 0.05).item()
+        
+        return dw
+    
+    def get_multi_timescale_stats(self) -> Dict[str, Any]:
+        """Get multi-timescale plasticity statistics."""
+        total_events = sum(self.plasticity_events.values())
+        
+        stats = {
+            "plasticity_events": self.plasticity_events.copy(),
+            "total_events": total_events
+        }
+        
+        if total_events > 0:
+            for scale, count in self.plasticity_events.items():
+                stats[f"{scale}_ratio"] = count / total_events
+        
+        if self.activity_history is not None:
+            stats["mean_activity"] = self.activity_history.mean().item()
+            stats["activity_variance"] = self.activity_history.var().item()
+        
+        if self.meta_learning_rates is not None:
+            stats["mean_learning_rate"] = self.meta_learning_rates.mean().item()
+            stats["learning_rate_variance"] = self.meta_learning_rates.var().item()
+        
+        return stats
+
+
+class AdaptiveTemporalEncoder:
+    """Adaptive temporal encoding with flexibility across time steps.
+    
+    Based on "Temporal Flexibility in Spiking Neural Networks: Towards 
+    Generalization Across Time Steps" (2025).
+    """
+    
+    def __init__(self, base_window: int = 100, adaptation_rate: float = 0.01):
+        """Initialize adaptive temporal encoder.
+        
+        Args:
+            base_window: Base temporal window size
+            adaptation_rate: Rate of temporal adaptation
+        """
+        self.base_window = base_window
+        self.adaptation_rate = adaptation_rate
+        self.adaptive_scaling = True
+        self.temporal_generalization = True
+        
+        # Learned temporal parameters
+        self.optimal_windows = {}
+        self.encoding_efficiency = {}
+    
+    def encode_with_flexibility(self, values: torch.Tensor, target_timesteps: int) -> torch.Tensor:
+        """Encode values with adaptive temporal flexibility.
+        
+        Args:
+            values: Input values to encode [batch, features]
+            target_timesteps: Target number of timesteps
+            
+        Returns:
+            Encoded spike trains [batch, features, timesteps]
+        """
+        batch_size, features = values.shape
+        device = values.device
+        
+        # Adapt window size based on target timesteps
+        if self.adaptive_scaling:
+            scale_factor = target_timesteps / self.base_window
+            adapted_window = int(self.base_window * scale_factor)
+        else:
+            adapted_window = target_timesteps
+        
+        # Initialize spike trains
+        spikes = torch.zeros(batch_size, features, adapted_window, device=device)
+        
+        # Adaptive rate encoding
+        for b in range(batch_size):
+            for f in range(features):
+                value = values[b, f].item()
+                
+                # Determine encoding strategy based on value range
+                if abs(value) < 0.1:
+                    # Sparse encoding for small values
+                    encoding_rate = max(0.01, abs(value) * 10)
+                else:
+                    # Dense encoding for larger values
+                    encoding_rate = min(0.5, abs(value))
+                
+                # Generate spike train with temporal jitter for robustness
+                base_intervals = int(1.0 / max(0.001, encoding_rate))
+                
+                for t in range(0, adapted_window, base_intervals):
+                    if t < adapted_window:
+                        # Add temporal jitter for generalization
+                        jitter = int(np.random.normal(0, base_intervals * 0.1))
+                        actual_t = max(0, min(adapted_window - 1, t + jitter))
+                        spikes[b, f, actual_t] = 1.0
+        
+        # Store efficiency metrics
+        sparsity = 1.0 - spikes.mean().item()
+        self.encoding_efficiency[target_timesteps] = sparsity
+        
+        return spikes
+    
+    def adapt_to_task(self, task_performance: float, current_window: int):
+        """Adapt temporal parameters based on task performance.
+        
+        Args:
+            task_performance: Performance metric (0-1)
+            current_window: Current temporal window size
+        """
+        # Update optimal window tracking
+        if current_window not in self.optimal_windows:
+            self.optimal_windows[current_window] = []
+        
+        self.optimal_windows[current_window].append(task_performance)
+        
+        # Adapt base window if needed
+        if len(self.optimal_windows[current_window]) > 10:
+            avg_performance = np.mean(self.optimal_windows[current_window])
+            
+            if avg_performance > 0.8:  # Good performance
+                # Maintain current parameters
+                pass
+            elif avg_performance < 0.6:  # Poor performance
+                # Adjust temporal parameters
+                self.base_window = int(self.base_window * (1 + self.adaptation_rate))
+    
+    def get_temporal_stats(self) -> Dict[str, Any]:
+        """Get temporal encoding statistics."""
+        stats = {
+            "base_window": self.base_window,
+            "adaptation_rate": self.adaptation_rate,
+            "adaptive_scaling": self.adaptive_scaling,
+            "temporal_generalization": self.temporal_generalization
+        }
+        
+        if self.optimal_windows:
+            best_window = max(self.optimal_windows.keys(), 
+                            key=lambda w: np.mean(self.optimal_windows[w]) if self.optimal_windows[w] else 0)
+            stats["best_window_size"] = best_window
+            stats["best_window_performance"] = np.mean(self.optimal_windows[best_window])
+        
+        if self.encoding_efficiency:
+            stats["mean_encoding_efficiency"] = np.mean(list(self.encoding_efficiency.values()))
+            stats["encoding_efficiency_by_window"] = self.encoding_efficiency.copy()
+        
+        return stats
