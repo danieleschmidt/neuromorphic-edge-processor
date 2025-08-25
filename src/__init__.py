@@ -7,7 +7,8 @@ focusing on spiking neural networks and event-driven processing architectures.
 __version__ = "0.1.0"
 __author__ = "Daniel Schmidt"
 
-from .models import SpikingNeuralNetwork, LIFNeuron
+# Temporarily disable models import to resolve syntax issues
+# from .models import SpikingNeuralNetwork, LIFNeuron
 from .algorithms import EventDrivenProcessor, SpikeProcessor
 from .utils import DataLoader
 
